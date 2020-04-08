@@ -125,6 +125,12 @@ public final class AuthorizationException extends Exception {
      */
     public static final int TYPE_OAUTH_REGISTRATION_ERROR = 4;
 
+    /**
+     * The error before pass link to WebView.
+     */
+
+    public static final String NETWORK_ERROR = "network_error";
+
     @VisibleForTesting
     static final String KEY_TYPE = "type";
 
