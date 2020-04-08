@@ -305,6 +305,9 @@ public class AuthorizationRequest {
     @VisibleForTesting
     static final String PARAM_NONCE = "nonce";
 
+    @VisibleForTesting
+    static final String PARAM_CODE = "code";
+
     private static final Set<String> BUILT_IN_PARAMS = builtInParams(
             PARAM_CLIENT_ID,
             PARAM_CODE_CHALLENGE,

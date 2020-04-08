@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Creates {@link java.net.HttpURLConnection} instances using the default, platform-provided
- * mechanism, with sensible production defaults.
+ * mechanism.
  */
 public final class DefaultConnectionBuilder implements ConnectionBuilder {
 

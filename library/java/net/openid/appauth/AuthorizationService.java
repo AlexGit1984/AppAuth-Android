@@ -17,6 +17,7 @@ package net.openid.appauth;
 import static net.openid.appauth.Preconditions.checkNotNull;
 
 import android.annotation.TargetApi;
+import android.app.Activity;
 import android.app.PendingIntent;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
@@ -146,37 +147,17 @@ public class AuthorizationService {
      * The parameters of this request are determined by both the authorization service
      * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
      * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
-     * If the user cancels the authorization request, the current activity will regain control.
-     */
-    public void performAuthorizationRequest(
-            @NonNull AuthorizationRequest request,
-            @NonNull PendingIntent completedIntent) {
-        performAuthorizationRequest(
-                request,
-                completedIntent,
-                null,
-                createCustomTabsIntentBuilder().build());
-    }
-
-    /**
-     * Sends an authorization request to the authorization service, using a
-     * [custom tab](https://developer.chrome.com/multidevice/android/customtabs)
-     * if available, or a browser instance.
-     * The parameters of this request are determined by both the authorization service
-     * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
-     * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
      * If the user cancels the authorization request, the provided
      * {@link PendingIntent cancel PendingIntent} will be invoked.
      */
     public void performAuthorizationRequest(
-            @NonNull AuthorizationRequest request,
-            @NonNull PendingIntent completedIntent,
-            @NonNull PendingIntent canceledIntent) {
-        performAuthorizationRequest(
-                request,
-                completedIntent,
-                canceledIntent,
-                createCustomTabsIntentBuilder().build());
+        @NonNull net.openid.appauth.AuthorizationRequest request,
+        @NonNull PendingIntent completedIntent,
+        @NonNull PendingIntent canceledIntent) {
+        performAuthRequest(
+            request,
+            completedIntent,
+            canceledIntent);
     }
 
     /**
@@ -187,20 +168,14 @@ public class AuthorizationService {
      * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
      * If the user cancels the authorization request, the current activity will regain control.
      *
-     * @param customTabsIntent
-     *     The intent that will be used to start the custom tab. It is recommended that this intent
-     *     be created with the help of {@link #createCustomTabsIntentBuilder(Uri[])}, which will
-     *     ensure that a warmed-up version of the browser will be used, minimizing latency.
      */
     public void performAuthorizationRequest(
-            @NonNull AuthorizationRequest request,
-            @NonNull PendingIntent completedIntent,
-            @NonNull CustomTabsIntent customTabsIntent) {
-        performAuthorizationRequest(
-                request,
-                completedIntent,
-                null,
-                customTabsIntent);
+        @NonNull net.openid.appauth.AuthorizationRequest request,
+        @NonNull PendingIntent completedIntent) {
+        performAuthRequest(
+            request,
+            completedIntent,
+            null);
     }
 
     /**
@@ -211,32 +186,56 @@ public class AuthorizationService {
      * of this request, the provided {@link PendingIntent completion PendingIntent} will be invoked.
      * If the user cancels the authorization request, the provided
      * {@link PendingIntent cancel PendingIntent} will be invoked.
-     *
-     * @param customTabsIntent
-     *     The intent that will be used to start the custom tab. It is recommended that this intent
-     *     be created with the help of {@link #createCustomTabsIntentBuilder(Uri[])}, which will
-     *     ensure that a warmed-up version of the browser will be used, minimizing latency.
      *
      * @throws android.content.ActivityNotFoundException if no suitable browser is available to
      *     perform the authorization flow.
      */
-    public void performAuthorizationRequest(
-            @NonNull AuthorizationRequest request,
-            @NonNull PendingIntent completedIntent,
-            @Nullable PendingIntent canceledIntent,
-            @NonNull CustomTabsIntent customTabsIntent) {
+    public void performAuthRequest(
+        @NonNull net.openid.appauth.AuthorizationRequest request,
+        @NonNull PendingIntent completedIntent,
+        @Nullable PendingIntent canceledIntent) {
         checkNotDisposed();
         checkNotNull(request);
         checkNotNull(completedIntent);
-        checkNotNull(customTabsIntent);
 
-        Intent authIntent = prepareAuthorizationRequestIntent(request, customTabsIntent);
-        mContext.startActivity(AuthorizationManagementActivity.createStartIntent(
-                mContext,
-                request,
-                authIntent,
-                completedIntent,
-                canceledIntent));
+        Intent authIntent = prepareAuthorizationRequestIntent(request);
+        mContext.startActivity(net.openid.appauth.AuthorizationManagementActivity.createStartIntent(
+            mContext,
+            request,
+            authIntent,
+            completedIntent,
+            canceledIntent));
+    }
+
+
+    /**
+     * Constructs an intent that encapsulates the provided request and custom tabs intent,
+     * and is intended to be launched via {@link Activity#startActivityForResult}.
+     * The parameters of this request are determined by both the authorization service
+     * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
+     * of this request, the activity that gets launched will call {@link Activity#setResult} with
+     * {@link Activity#RESULT_OK} and an {@link Intent} containing authorization completion
+     * information. If the user presses the back button or closes the browser tab, the launched
+     * activity will call {@link Activity#setResult} with
+     * {@link Activity#RESULT_CANCELED} without a data {@link Intent}. Note that
+     * {@link Activity#RESULT_OK} indicates the authorization request completed,
+     * not necessarily that it was a successful authorization.
+     *
+     * @param request
+     *     The intent that will be used to start the custom webview.
+     *
+     * @throws android.content.ActivityNotFoundException if no suitable browser is available to
+     *     perform the authorization flow.
+     */
+    private Intent performAuthRequest(
+        net.openid.appauth.AuthorizationRequest request) {
+        checkNotDisposed();
+        Uri requestUri = request.toUri();
+        Intent intent;
+        checkNotNull(request);
+        intent = new Intent(mContext, net.openid.appauth.SingleSignOnActivity.class);
+        intent.setData(requestUri);
+        return intent;
     }
 
     /**
@@ -252,49 +251,25 @@ public class AuthorizationService {
      * {@link Activity#RESULT_OK} indicates the authorization request completed,
      * not necessarily that it was a successful authorization.
      *
-     * @param customTabsIntent
-     *     The intent that will be used to start the custom tab. It is recommended that this intent
-     *     be created with the help of {@link #createCustomTabsIntentBuilder(Uri[])}, which will
-     *     ensure that a warmed-up version of the browser will be used, minimizing latency.
-     *
+     * @param customTabsIntent The intent that will be used to start the custom tab. It is
+     *                         recommended that this intent
+     *                         be created with the help of
+     *                         , which will
+     *                         ensure that a warmed-up version of the browser will be used,
+     *                         minimizing latency.
      * @throws android.content.ActivityNotFoundException if no suitable browser is available to
-     *     perform the authorization flow.
+     *                                                   perform the authorization flow.
      */
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     public Intent getAuthorizationRequestIntent(
-            @NonNull AuthorizationRequest request,
-            @NonNull CustomTabsIntent customTabsIntent) {
+        @NonNull net.openid.appauth.AuthorizationRequest request,
+        @NonNull CustomTabsIntent customTabsIntent) {
 
-        Intent authIntent = prepareAuthorizationRequestIntent(request, customTabsIntent);
-        return AuthorizationManagementActivity.createStartForResultIntent(
-                mContext,
-                request,
-                authIntent);
-    }
-
-    /**
-     * Constructs an intent that encapsulates the provided request and a default custom tabs intent,
-     * and is intended to be launched via {@link Activity#startActivityForResult}
-     * When started, the intent launches an {@link Activity} that sends an authorization request
-     * to the authorization service, using a
-     * [custom tab](https://developer.chrome.com/multidevice/android/customtabs).
-     * The parameters of this request are determined by both the authorization service
-     * configuration and the provided {@link AuthorizationRequest request object}. Upon completion
-     * of this request, the activity that gets launched will call {@link Activity#setResult} with
-     * {@link Activity#RESULT_OK} and an {@link Intent} containing authorization completion
-     * information. If the user presses the back button or closes the browser tab, the launched
-     * activity will call {@link Activity#setResult} with
-     * {@link Activity#RESULT_CANCELED} without a data {@link Intent}. Note that
-     * {@link Activity#RESULT_OK} indicates the authorization request completed,
-     * not necessarily that it was a successful authorization.
-     *
-     * @throws android.content.ActivityNotFoundException if no suitable browser is available to
-     *     perform the authorization flow.
-     */
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    public Intent getAuthorizationRequestIntent(
-            @NonNull AuthorizationRequest request) {
-        return getAuthorizationRequestIntent(request, createCustomTabsIntentBuilder().build());
+        Intent authIntent = prepareAuthorizationRequestIntent(request);
+        return net.openid.appauth.AuthorizationManagementActivity.createStartForResultIntent(
+            mContext,
+            request,
+            authIntent);
     }
 
     /**
@@ -349,7 +324,7 @@ public class AuthorizationService {
     /**
      * Disposes state that will not normally be handled by garbage collection. This should be
      * called when the authorization service is no longer required, including when any owning
-     * activity is paused or destroyed (i.e. in {@link android.app.Activity#onStop()}).
+     * activity is paused or destroyed (i.e. in {@link android.app.Activity#()}).
      */
     public void dispose() {
         if (mDisposed) {
@@ -365,32 +340,15 @@ public class AuthorizationService {
         }
     }
 
+
     private Intent prepareAuthorizationRequestIntent(
-            AuthorizationRequest request,
-            CustomTabsIntent customTabsIntent) {
+        net.openid.appauth.AuthorizationRequest request) {
         checkNotDisposed();
-
-        if (mBrowser == null) {
-            throw new ActivityNotFoundException();
-        }
-
         Uri requestUri = request.toUri();
         Intent intent;
-        if (mBrowser.useCustomTab) {
-            intent = customTabsIntent.intent;
-        } else {
-            intent = new Intent(Intent.ACTION_VIEW);
-        }
-        intent.setPackage(mBrowser.packageName);
+        checkNotNull(request);
+        intent = new Intent(mContext, net.openid.appauth.SingleSignOnActivity.class);
         intent.setData(requestUri);
-
-        Logger.debug("Using %s as browser for auth, custom tab = %s",
-                intent.getPackage(),
-                mBrowser.useCustomTab.toString());
-
-        Logger.debug("Initiating authorization request to %s",
-                request.configuration.authorizationEndpoint);
-
         return intent;
     }
 
