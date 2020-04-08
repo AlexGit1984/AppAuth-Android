@@ -49,12 +49,6 @@ class CustomWebView extends WebViewClient {
         return super.shouldOverrideUrlLoading(view, request);
     }
 
-    @Override
-    public void onReceivedSslError(final WebView view, final SslErrorHandler handler,
-        final SslError error) {
-        handler.proceed();
-    }
-
     /**
      * Attach {@link WebView} to {@link WebViewClient} and initialize it.
      *
